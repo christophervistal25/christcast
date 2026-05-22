@@ -5,7 +5,7 @@ go 1.23
 require (
 	github.com/BurntSushi/toml v1.4.0
 	github.com/fsnotify/fsnotify v1.10.1
-	github.com/gotk3/gotk3 v0.6.3
+	github.com/gotk3/gotk3 v0.6.4
 	github.com/jezek/xgb v1.3.1
 	github.com/jezek/xgbutil v0.0.0-20260124183602-9fd151d6a51a
 	github.com/vmihailenco/msgpack/v5 v5.4.1
