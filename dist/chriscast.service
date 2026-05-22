@@ -1,0 +1,14 @@
+[Unit]
+Description=chriscast file launcher daemon
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/chriscast daemon
+Restart=on-failure
+RestartSec=3
+# Inherit DISPLAY/WAYLAND_DISPLAY/DBUS_SESSION_BUS_ADDRESS from the user session
+PassEnvironment=DISPLAY WAYLAND_DISPLAY XAUTHORITY DBUS_SESSION_BUS_ADDRESS
+
+[Install]
+WantedBy=graphical-session.target

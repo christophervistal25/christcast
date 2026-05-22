@@ -1,0 +1,92 @@
+version: 2
+
+project_name: chriscast
+
+# Note: The GTK-based UI (built with `-tags gtk`) requires CGO and GTK3
+# development headers, which makes reliable cross-compilation impractical
+# from a single CI host. The published binary archives therefore contain
+# only the CLI build. Users who want the UI should build it from source:
+#   make build-ui
+# (requires libgtk-3-dev / gtk3-devel and a working CGO toolchain).
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: chriscast-cli
+    binary: chriscast
+    main: ./cmd/chriscast
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README*
+      - LICENSE*
+      - dist/**/*
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  use: git
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))??!?:.+$'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^.*?fix(\(.+\))??!?:.+$'
+      order: 1
+    - title: Performance
+      regexp: '^.*?perf(\(.+\))??!?:.+$'
+      order: 2
+    - title: Refactors
+      regexp: '^.*?refactor(\(.+\))??!?:.+$'
+      order: 3
+    - title: Documentation
+      regexp: '^.*?docs(\(.+\))??!?:.+$'
+      order: 4
+    - title: Tests
+      regexp: '^.*?test(\(.+\))??!?:.+$'
+      order: 5
+    - title: Build & CI
+      regexp: '^.*?(build|ci)(\(.+\))??!?:.+$'
+      order: 6
+    - title: Others
+      order: 999
+  filters:
+    exclude:
+      - '^chore:'
+      - '^Merge '
+
+release:
+  github:
+    owner: ""
+    name: ""
+  disable_default_release_notes: false
+  draft: false
+  prerelease: auto
+  header: |
+    ## chriscast {{ .Tag }}
+
+    Pre-built binaries below contain the **CLI only**.
+    The GTK desktop UI requires CGO + GTK3 headers and must be built from source
+    (`make build-ui`).

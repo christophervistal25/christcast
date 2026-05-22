@@ -1,0 +1,55 @@
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - gosimple
+    - unused
+    - ineffassign
+    - gofumpt
+    - revive
+    - gocritic
+    - misspell
+    - prealloc
+    - bodyclose
+    - contextcheck
+  disable:
+    - gomnd
+    - goimports
+    - exhaustruct
+
+linters-settings:
+  gofumpt:
+    extra-rules: true
+  govet:
+    enable-all: true
+  staticcheck:
+    checks:
+      - all
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: error-return
+      - name: error-naming
+      - name: exported
+
+issues:
+  exclude-dirs:
+    - vendor
+    - dist
+    - bin
+  exclude-rules:
+    - path: internal/ui/
+      linters:
+        - revive
+      text: "exported"
+    - path: internal/ui/
+      linters:
+        - errcheck
+      source: "cmd.Wait\\(\\)"

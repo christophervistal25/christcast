@@ -1,0 +1,17 @@
+# Funding configuration for chriscast.
+# Uncomment and fill in any platforms you want to enable.
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+
+# github: [username]                 # GitHub Sponsors username(s)
+# patreon: username                  # Patreon username
+# open_collective: project-name      # Open Collective project name
+# ko_fi: username                    # Ko-fi username
+# tidelift: platform-name/package-name
+# community_bridge: project-name     # LFX Crowdfunding project
+# liberapay: username                # Liberapay username
+# issuehunt: username                # IssueHunt username
+# lfx_crowdfunding: project-name
+# polar: username                    # Polar.sh username
+# buy_me_a_coffee: username          # Buy Me a Coffee username
+# thanks_dev: username               # thanks.dev username
+# custom: ['https://example.com/donate']

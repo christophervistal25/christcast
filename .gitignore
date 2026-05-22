@@ -1,0 +1,27 @@
+# Go build artifacts
+bin/
+*.test
+*.out
+coverage.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific: session captures and serialized state
+session-ses_*.md
+*.msgpack
+
+# Distribution build artifacts (keep the systemd unit file)
+dist/build/
+dist/release/
+dist/*.tar.gz
+dist/*.zip
+!dist/chriscast.service

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & Discussions
+    url: https://github.com/chriscast/chriscast/discussions
+    about: Ask questions, share ideas, or chat with the community here.
+  - name: Documentation
+    url: https://github.com/chriscast/chriscast#readme
+    about: Read the docs before filing an issue — your question may already be answered.

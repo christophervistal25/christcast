@@ -1,0 +1,83 @@
+# chriscast example configuration
+# Copy this file to ~/.config/chriscast/config.toml and edit to taste.
+#
+# chriscast indexes one or more "scopes" (directory roots) and lets you
+# fuzzy-search across them with a global hotkey.
+
+# Global hotkey that summons the launcher window.
+# Use X11/Wayland-style modifier names: Ctrl, Alt, Shift, Super.
+hotkey = "Ctrl+Space"
+
+# Maximum number of results shown in the picker.
+max_results = 50
+
+# Where to persist the index between runs.
+# (Relative paths are resolved against $XDG_STATE_HOME or ~/.local/state.)
+index_path = "chriscast/index.msgpack"
+
+# ---------------------------------------------------------------------------
+# Scopes: each scope is a root directory chriscast will walk and index.
+# Add as many [[scopes]] tables as you need.
+# ---------------------------------------------------------------------------
+
+[[scopes]]
+# Human-friendly name shown in the UI.
+name = "home"
+# Root directory. $HOME and ~ are expanded.
+path = "$HOME"
+# Follow symlinks while walking. Leave false to avoid cycles.
+follow_symlinks = false
+# Maximum depth (0 = unlimited).
+max_depth = 0
+
+[[scopes]]
+name = "web"
+path = "/var/www"
+follow_symlinks = false
+max_depth = 0
+
+# ---------------------------------------------------------------------------
+# Excludes: glob patterns (relative to each scope root) that should never
+# be indexed. These apply to ALL scopes.
+# ---------------------------------------------------------------------------
+excludes = [
+  # VCS metadata
+  ".git",
+  ".hg",
+  ".svn",
+
+  # Dependency / package directories
+  "node_modules",
+  "vendor",
+  "bower_components",
+  ".venv",
+  "venv",
+  "__pycache__",
+
+  # Build output
+  "dist",
+  "build",
+  "target",
+  "bin",
+  "obj",
+  ".next",
+  ".nuxt",
+  ".cache",
+  ".parcel-cache",
+
+  # IDE / editor
+  ".idea",
+  ".vscode",
+  ".DS_Store",
+
+  # Logs and temp
+  "*.log",
+  "tmp",
+  "temp",
+
+  # Large binary blobs we never want to surface
+  "*.iso",
+  "*.img",
+  "*.qcow2",
+  "*.vmdk",
+]
