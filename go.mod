@@ -1,6 +1,6 @@
 module github.com/chriscast/chriscast
 
-go 1.23
+go 1.25.0
 
 require (
 	github.com/BurntSushi/toml v1.4.0
@@ -9,7 +9,7 @@ require (
 	github.com/jezek/xgb v1.3.1
 	github.com/jezek/xgbutil v0.0.0-20260124183602-9fd151d6a51a
 	github.com/vmihailenco/msgpack/v5 v5.4.1
-	golang.org/x/text v0.18.0
+	golang.org/x/text v0.37.0
 )
 
 require (
