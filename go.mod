@@ -3,7 +3,7 @@ module github.com/chriscast/chriscast
 go 1.23
 
 require (
-	github.com/BurntSushi/toml v1.4.0
+	github.com/BurntSushi/toml v1.6.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gotk3/gotk3 v0.6.3
 	github.com/jezek/xgb v1.3.1
