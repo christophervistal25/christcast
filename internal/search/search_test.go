@@ -91,3 +91,23 @@ func TestLiveReaddirFallback(t *testing.T) {
 		t.Fatalf("first result should be dir, got %+v", got[0])
 	}
 }
+
+func TestAppOutranksSameNamedFile(t *testing.T) {
+	// An indexed .desktop app (IsApp=true) should rank above a regular file
+	// with the same basename for a query that matches that basename.
+	ix := newIxWith(
+		store.FileInfo{Path: "/home/u/notes/firefox", Base: "firefox"},
+		store.FileInfo{Path: "/usr/share/applications/firefox.desktop", Base: "Firefox", IsApp: true},
+		store.FileInfo{Path: "/tmp/firefox.log", Base: "firefox.log"},
+	)
+	got := search.Search(ix, "firefox", 10)
+	if len(got) == 0 {
+		t.Fatal("expected at least one result for 'firefox'")
+	}
+	if !got[0].File.IsApp {
+		t.Fatalf("app entry should rank first, got %+v (full: %+v)", got[0].File, got)
+	}
+	if got[0].File.Base != "Firefox" {
+		t.Fatalf("first result should be the Firefox app, got base=%q", got[0].File.Base)
+	}
+}

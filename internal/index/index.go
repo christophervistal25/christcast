@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chriscast/chriscast/internal/apps"
 	"github.com/chriscast/chriscast/internal/config"
 	"github.com/chriscast/chriscast/internal/normalize"
 	"github.com/chriscast/chriscast/internal/scanner"
@@ -89,6 +90,10 @@ func (ix *Index) Build(c *config.Config, p Progress) (scanner.Stats, error) {
 	})
 	if err != nil {
 		return st, err
+	}
+	// Index installed XDG applications alongside files.
+	for _, fi := range apps.Scan() {
+		ix.Upsert(fi)
 	}
 	_ = start
 	return st, nil

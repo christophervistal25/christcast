@@ -9,6 +9,8 @@ type FileInfo struct {
 	ModTime int64  `msgpack:"m"`
 	Size    int64  `msgpack:"s"`
 	IsDir   bool   `msgpack:"d"`
+	IsApp   bool   `msgpack:"a,omitempty"` // .desktop application entry
+	Icon    string `msgpack:"icon,omitempty"` // raw Icon= value from .desktop (name or absolute path)
 }
 
 type Store struct {

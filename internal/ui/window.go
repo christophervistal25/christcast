@@ -361,11 +361,15 @@ func buildRow(r search.Result) *gtk.ListBoxRow {
 	row, _ := gtk.ListBoxRowNew()
 	hbox, _ := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 0)
 
-	icon, _ := gtk.LabelNew(glyphFor(r.File))
-	icon.SetHAlign(gtk.ALIGN_CENTER)
-	icon.SetSizeRequest(28, -1)
-	addClass(&icon.Widget, "cct-icon")
-	hbox.PackStart(icon, false, false, 0)
+	if iconW := appIconWidget(r.File); iconW != nil {
+		hbox.PackStart(iconW, false, false, 0)
+	} else {
+		icon, _ := gtk.LabelNew(glyphFor(r.File))
+		icon.SetHAlign(gtk.ALIGN_CENTER)
+		icon.SetSizeRequest(28, -1)
+		addClass(&icon.Widget, "cct-icon")
+		hbox.PackStart(icon, false, false, 0)
+	}
 
 	vbox, _ := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
 	label := r.File.Base
@@ -388,8 +392,48 @@ func buildRow(r search.Result) *gtk.ListBoxRow {
 	return row
 }
 
+// appIconWidget returns a 28-wide *gtk.Image rendering the .desktop file's
+// Icon= value (absolute path → load from file, otherwise → themed icon name).
+// Returns nil when fi is not an app, has no icon, or icon resolution fails —
+// caller should fall back to the Unicode glyph label.
+func appIconWidget(fi *store.FileInfo) gtk.IWidget {
+	if fi == nil || !fi.IsApp || fi.Icon == "" {
+		return nil
+	}
+	const px = 24
+	var img *gtk.Image
+	if filepath.IsAbs(fi.Icon) {
+		if _, err := os.Stat(fi.Icon); err != nil {
+			return nil
+		}
+		pix, err := gdk.PixbufNewFromFileAtScale(fi.Icon, px, px, true)
+		if err != nil || pix == nil {
+			return nil
+		}
+		im, err := gtk.ImageNewFromPixbuf(pix)
+		if err != nil || im == nil {
+			return nil
+		}
+		img = im
+	} else {
+		im, err := gtk.ImageNewFromIconName(fi.Icon, gtk.ICON_SIZE_DND)
+		if err != nil || im == nil {
+			return nil
+		}
+		im.SetPixelSize(px)
+		img = im
+	}
+	img.SetHAlign(gtk.ALIGN_CENTER)
+	img.SetSizeRequest(28, -1)
+	addClass(&img.Widget, "cct-icon")
+	return img
+}
+
 // glyphFor returns a small Unicode glyph chosen by file kind / extension.
 func glyphFor(fi *store.FileInfo) string {
+	if fi.IsApp {
+		return "✦"
+	}
 	if fi.IsDir {
 		return "📁"
 	}
@@ -431,7 +475,12 @@ func (a *App) openIndex(i int) {
 	if i < 0 || i >= len(a.results) {
 		return
 	}
-	open(a.results[i].File.Path)
+	fi := a.results[i].File
+	if fi.IsApp {
+		launchApp(fi.Path)
+	} else {
+		open(fi.Path)
+	}
 	a.quitOrHide()
 }
 
@@ -608,6 +657,80 @@ func open(p string) {
 		return
 	}
 	go cmd.Wait()
+}
+
+// launchApp launches a .desktop application file. Prefers `gtk-launch`
+// (handles Exec field-codes, env, working dir correctly), then `gio
+// launch`, falling back to a manual parse + exec of the Exec line.
+func launchApp(desktopPath string) {
+	id := strings.TrimSuffix(filepath.Base(desktopPath), ".desktop")
+	if bin, err := exec.LookPath("gtk-launch"); err == nil {
+		cmd := exec.Command(bin, id)
+		if err := cmd.Start(); err == nil {
+			go cmd.Wait()
+			return
+		}
+	}
+	if bin, err := exec.LookPath("gio"); err == nil {
+		cmd := exec.Command(bin, "launch", desktopPath)
+		if err := cmd.Start(); err == nil {
+			go cmd.Wait()
+			return
+		}
+	}
+	// last resort: parse Exec=, strip %-codes, exec via sh -c.
+	exe := readExec(desktopPath)
+	if exe == "" {
+		fmt.Fprintln(stderr(), "launchApp: no usable launcher (need gtk-launch or gio)")
+		return
+	}
+	cmd := exec.Command("sh", "-c", exe+" &")
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintln(stderr(), "launchApp fallback:", err)
+		return
+	}
+	go cmd.Wait()
+}
+
+// readExec extracts the Exec= line from a .desktop file and strips XDG
+// field codes (%f, %u, %F, %U, %i, %c, %k) which we don't pass anyway.
+func readExec(desktopPath string) string {
+	data, err := os.ReadFile(desktopPath)
+	if err != nil {
+		return ""
+	}
+	inEntry := false
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.HasPrefix(line, "[") {
+			inEntry = line == "[Desktop Entry]"
+			continue
+		}
+		if !inEntry {
+			continue
+		}
+		if strings.HasPrefix(line, "Exec=") {
+			raw := strings.TrimPrefix(line, "Exec=")
+			out := make([]rune, 0, len(raw))
+			skip := false
+			for _, r := range raw {
+				if skip {
+					skip = false
+					continue
+				}
+				if r == '%' {
+					skip = true
+					continue
+				}
+				out = append(out, r)
+			}
+			return strings.TrimSpace(string(out))
+		}
+	}
+	return ""
 }
 
 // terminalCandidate is one possible terminal emulator + how to tell it

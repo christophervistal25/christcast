@@ -96,6 +96,9 @@ func Search(ix *index.Index, q string, limit int) []Result {
 		if fi.IsDir {
 			s += 2 // slight nudge so dirs aren't buried beneath same-name files
 		}
+		if fi.IsApp {
+			s += 10 // nudge apps above same-name files without crushing other signals
+		}
 		heap.Push(h, Result{File: fi, Score: s})
 		if h.Len() > limit {
 			heap.Pop(h)
