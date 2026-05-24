@@ -15,12 +15,12 @@ import (
 // Listener grabs a global hotkey via X11 XGrabKey and fires cb on press.
 type Listener struct {
 	x   *xgbutil.XUtil
-	cb  func()
+	cb  func(timestamp uint32)
 	mod uint16
 	kc  xproto.Keycode
 }
 
-func New(combo string, cb func()) (*Listener, error) {
+func New(combo string, cb func(timestamp uint32)) (*Listener, error) {
 	x, err := xgbutil.NewConn()
 	if err != nil {
 		return nil, fmt.Errorf("X conn: %w", err)
@@ -38,8 +38,8 @@ func New(combo string, cb func()) (*Listener, error) {
 	if err := keybind.GrabChecked(x, root, mods, kcs[0]); err != nil {
 		return nil, fmt.Errorf("grab: %w", err)
 	}
-	xevent.KeyPressFun(func(_ *xgbutil.XUtil, _ xevent.KeyPressEvent) {
-		cb()
+	xevent.KeyPressFun(func(_ *xgbutil.XUtil, e xevent.KeyPressEvent) {
+		cb(uint32(e.Time))
 	}).Connect(x, root)
 	return l, nil
 }

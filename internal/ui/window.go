@@ -19,21 +19,26 @@ import (
 )
 
 const (
-	winWidth      = 720
-	winHeight     = 480
-	debounceMS    = 50
+	winWidth   = 720
+	winHeight  = 480
+	winCompact = 64 // compact = entry only, no results panel
+	debounceMS = 50
 )
 
 type App struct {
-	cfg      *config.Config
-	ix       *index.Index
-	win      *gtk.Window
-	entry    *gtk.Entry
-	list     *gtk.ListBox
-	scrolled *gtk.ScrolledWindow
-	results  []search.Result
-	pending  glib.SourceHandle
-	daemon   bool
+	cfg       *config.Config
+	ix        *index.Index
+	win       *gtk.Window
+	entry     *gtk.Entry
+	list      *gtk.ListBox
+	scrolled  *gtk.ScrolledWindow
+	sepTop    *gtk.Separator
+	hintSep   *gtk.Separator
+	hintBar   *gtk.Box
+	results   []search.Result
+	pending   glib.SourceHandle
+	daemon    bool
+	expanded  bool
 }
 
 func Run(cfg *config.Config, ix *index.Index) error {
@@ -59,16 +64,60 @@ func (a *App) SetDaemon(v bool) { a.daemon = v }
 
 func (a *App) Main() { gtk.Main() }
 
-func (a *App) Show() {
-	// only reset when window was hidden; rapid re-press keeps state.
-	if !a.win.GetVisible() {
-		a.entry.SetText("")
-		a.results = nil
-		a.showEmpty("Type to search.")
-	}
+func (a *App) Show() { a.ShowAt(0) }
+
+// ShowAt opens the overlay; timestamp should be the X11 event time that
+// triggered the show (from the hotkey handler) so window managers honor
+// the focus request and don't apply focus-steal prevention.
+func (a *App) ShowAt(timestamp uint32) {
+	// always reset on Show — Raycast-like compact open.
+	a.entry.SetText("")
+	a.results = nil
+	a.clearList()
+	a.expanded = true // force setExpanded to apply
+	a.setExpanded(false)
+	// mark heavy widgets "don't auto-show" so ShowAll won't re-show them.
+	a.sepTop.SetNoShowAll(true)
+	a.scrolled.SetNoShowAll(true)
+	a.hintSep.SetNoShowAll(true)
+	a.hintBar.SetNoShowAll(true)
 	a.win.ShowAll()
-	a.win.Present()
+	a.win.Resize(winWidth, winCompact)
+	a.positionTop()
+	if timestamp != 0 {
+		a.win.PresentWithTime(timestamp)
+	} else {
+		a.win.Present()
+	}
 	a.entry.GrabFocus()
+}
+
+// positionTop centers the window horizontally on the active monitor and
+// anchors it near the top (Raycast-style — not vertically centered).
+func (a *App) positionTop() {
+	const topOffset = 120
+	display, err := gdk.DisplayGetDefault()
+	if err != nil || display == nil {
+		return
+	}
+	// prefer the monitor where the cursor is; fall back to monitor 0.
+	monitor, merr := display.GetPrimaryMonitor()
+	if merr != nil || monitor == nil {
+		monitor, _ = display.GetMonitor(0)
+	}
+	if monitor == nil {
+		return
+	}
+	geom := monitor.GetWorkarea()
+	if geom == nil {
+		geom = monitor.GetGeometry()
+	}
+	if geom == nil {
+		return
+	}
+	x := geom.GetX() + (geom.GetWidth()-winWidth)/2
+	y := geom.GetY() + topOffset
+	a.win.Move(x, y)
 }
 
 func (a *App) Hide() {
@@ -86,15 +135,24 @@ func (a *App) build() error {
 	}
 	a.win = w
 	w.SetTitle("chriscast")
-	w.SetDefaultSize(winWidth, winHeight)
+	w.SetDefaultSize(winWidth, winCompact)
 	w.SetDecorated(false)
 	w.SetResizable(false)
 	w.SetKeepAbove(true)
 	w.SetSkipTaskbarHint(true)
 	w.SetSkipPagerHint(true)
-	w.SetPosition(gtk.WIN_POS_CENTER_ALWAYS)
+	w.SetPosition(gtk.WIN_POS_NONE)
 	w.SetTypeHint(gdk.WINDOW_TYPE_HINT_DIALOG)
 	addClass(&w.Widget, "cct-overlay")
+
+	// enable per-pixel transparency so the rounded corners show the desktop
+	// behind them instead of a black square.
+	if screen := w.GetScreen(); screen != nil {
+		if visual, _ := screen.GetRGBAVisual(); visual != nil {
+			w.SetVisual(visual)
+		}
+	}
+	w.SetAppPaintable(true)
 
 	if err := loadCSS(); err != nil {
 		return err
@@ -121,6 +179,7 @@ func (a *App) build() error {
 	}
 	addClass(&sep.Widget, "cct-sep")
 	box.PackStart(sep, false, false, 0)
+	a.sepTop = sep
 
 	scrolled, err := gtk.ScrolledWindowNew(nil, nil)
 	if err != nil {
@@ -147,12 +206,14 @@ func (a *App) build() error {
 	}
 	addClass(&hintSep.Widget, "cct-sep")
 	box.PackStart(hintSep, false, false, 0)
+	a.hintSep = hintSep
 
 	hintBar, err := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 0)
 	if err != nil {
 		return err
 	}
 	addClass(&hintBar.Widget, "cct-hint-bar")
+	a.hintBar = hintBar
 
 	hintInner, err := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 0)
 	if err != nil {
@@ -186,8 +247,35 @@ func (a *App) build() error {
 	})
 
 	a.entry.GrabFocus()
-	a.showEmpty("Type to search.")
+	// start compact — only the search field is visible until results arrive.
+	a.setExpanded(false)
 	return nil
+}
+
+// setExpanded toggles between compact (search field only) and full
+// (search field + results panel + hint bar). Resizes the window to match.
+func (a *App) setExpanded(on bool) {
+	if a.expanded == on && a.scrolled != nil {
+		return
+	}
+	a.expanded = on
+	if on {
+		a.sepTop.SetNoShowAll(false)
+		a.scrolled.SetNoShowAll(false)
+		a.hintSep.SetNoShowAll(false)
+		a.hintBar.SetNoShowAll(false)
+		a.sepTop.Show()
+		a.scrolled.Show()
+		a.hintSep.Show()
+		a.hintBar.Show()
+		a.win.Resize(winWidth, winHeight)
+	} else {
+		a.sepTop.Hide()
+		a.scrolled.Hide()
+		a.hintSep.Hide()
+		a.hintBar.Hide()
+		a.win.Resize(winWidth, winCompact)
+	}
 }
 
 func (a *App) quitOrHide() {
@@ -216,7 +304,7 @@ func (a *App) runQuery() {
 	if text == "" {
 		a.results = nil
 		a.clearList()
-		a.showEmpty("Type to search.")
+		a.setExpanded(false)
 		return
 	}
 	a.results = search.Search(a.ix, text, a.cfg.MaxResults)
@@ -251,9 +339,11 @@ func (a *App) showEmpty(msg string) {
 func (a *App) renderList() {
 	a.clearList()
 	if len(a.results) == 0 {
+		a.setExpanded(true)
 		a.showEmpty("No matches.")
 		return
 	}
+	a.setExpanded(true)
 	for _, r := range a.results {
 		row := buildRow(r)
 		a.list.Add(row)

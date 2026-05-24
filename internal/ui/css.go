@@ -3,12 +3,23 @@
 package ui
 
 const styleCSS = `
+/* Outer window is transparent so rounded corners reveal the desktop
+   instead of the compositor-default black square. */
 window.cct-overlay {
+    background-color: transparent;
+    font-family: -apple-system, "SF Pro Display", "Inter", "Segoe UI", "Cantarell", sans-serif;
+    color: #f5f5f7;
+}
+/* Inner content box paints the actual rounded surface. */
+window.cct-overlay > box {
     background-color: #1c1c1e;
     border: 1px solid #3a3a3c;
     border-radius: 10px;
-    font-family: -apple-system, "SF Pro Display", "Inter", "Segoe UI", "Cantarell", sans-serif;
-    color: #f5f5f7;
+}
+window.cct-overlay decoration {
+    background-color: transparent;
+    box-shadow: none;
+    border: none;
 }
 
 entry.cct-entry {

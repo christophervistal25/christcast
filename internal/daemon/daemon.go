@@ -51,9 +51,9 @@ func (d *Daemon) Run() error {
 	}()
 
 	// hotkey listener
-	hk, err := hotkey.New(d.cfg.Hotkey, func() {
+	hk, err := hotkey.New(d.cfg.Hotkey, func(ts uint32) {
 		glib.IdleAdd(func() bool {
-			d.app.Show()
+			d.app.ShowAt(ts)
 			return false
 		})
 	})
