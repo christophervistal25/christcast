@@ -460,12 +460,31 @@ func (a *App) copyIndex(i int) {
 	if i < 0 || i >= len(a.results) {
 		return
 	}
+	path := a.results[i].File.Path
 	clip, err := gtk.ClipboardGet(gdk.SELECTION_CLIPBOARD)
 	if err != nil {
 		return
 	}
-	clip.SetText(a.results[i].File.Path)
+	clip.SetText(path)
 	clip.Store()
+	notify("Copied to clipboard", path)
+}
+
+// notify fires a desktop notification via libnotify (notify-send). Silent
+// no-op if notify-send isn't installed. Kept minimal: extra flags like
+// --app-name / --hint=desktop-entry can cause GNOME to filter the toast
+// when the user has muted the matching app entry, which is the wrong
+// failure mode here.
+func notify(title, body string) {
+	bin, err := exec.LookPath("notify-send")
+	if err != nil {
+		return
+	}
+	cmd := exec.Command(bin, title, body)
+	if err := cmd.Start(); err != nil {
+		return
+	}
+	go cmd.Wait()
 }
 
 func (a *App) onKey(_ *gtk.Window, ev *gdk.Event) bool {
