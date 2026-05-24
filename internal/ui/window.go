@@ -4,6 +4,8 @@ package ui
 
 import (
 	"fmt"
+	"net/url"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -223,6 +225,7 @@ func (a *App) build() error {
 	for _, h := range []string{
 		"↵  open",
 		"Ctrl+↵  reveal",
+		"Ctrl+O  terminal",
 		"Ctrl+C  copy path",
 		"Esc  close",
 	} {
@@ -440,6 +443,19 @@ func (a *App) revealIndex(i int) {
 	a.quitOrHide()
 }
 
+func (a *App) terminalIndex(i int) {
+	if i < 0 || i >= len(a.results) {
+		return
+	}
+	fi := a.results[i].File
+	dir := fi.Path
+	if !fi.IsDir {
+		dir = filepath.Dir(dir)
+	}
+	openTerminal(dir)
+	a.quitOrHide()
+}
+
 func (a *App) copyIndex(i int) {
 	if i < 0 || i >= len(a.results) {
 		return
@@ -495,6 +511,14 @@ func (a *App) onKey(_ *gtk.Window, ev *gdk.Event) bool {
 			a.openIndex(idx)
 		}
 		return true
+	case gdk.KEY_o, gdk.KEY_O:
+		if ctrl {
+			row := a.list.GetSelectedRow()
+			if row != nil {
+				a.terminalIndex(row.GetIndex())
+				return true
+			}
+		}
 	case gdk.KEY_c, gdk.KEY_C:
 		if ctrl {
 			start, end, _ := a.entry.GetSelectionBounds()
@@ -565,6 +589,79 @@ func open(p string) {
 		return
 	}
 	go cmd.Wait()
+}
+
+// terminalCandidate is one possible terminal emulator + how to tell it
+// which working directory to start in.
+type terminalCandidate struct {
+	bin  string
+	args func(dir string) []string
+}
+
+var terminalCandidates = []terminalCandidate{
+	// Generic XDG terminal launcher (newest).
+	{"xdg-terminal-exec", func(d string) []string { return []string{} }},
+	// Common Linux terminals — most accept some form of "start here".
+	{"gnome-terminal", func(d string) []string { return []string{"--working-directory=" + d} }},
+	{"konsole", func(d string) []string { return []string{"--workdir", d} }},
+	{"kitty", func(d string) []string { return []string{"-d", d} }},
+	{"alacritty", func(d string) []string { return []string{"--working-directory", d} }},
+	{"wezterm", func(d string) []string { return []string{"start", "--cwd", d} }},
+	{"foot", func(d string) []string { return []string{"--working-directory=" + d} }},
+	{"tilix", func(d string) []string { return []string{"--working-directory=" + d} }},
+	{"xfce4-terminal", func(d string) []string { return []string{"--working-directory=" + d} }},
+	{"ptyxis", func(d string) []string { return []string{"--working-directory=" + d} }},
+	{"x-terminal-emulator", func(d string) []string {
+		// debian-alternative — only some honor --working-directory, so chdir via shell.
+		return []string{"-e", "sh", "-c", "cd " + shQuote(d) + " && exec ${SHELL:-bash}"}
+	}},
+	{"xterm", func(d string) []string {
+		return []string{"-e", "sh", "-c", "cd " + shQuote(d) + " && exec ${SHELL:-bash}"}
+	}},
+}
+
+func openTerminal(dir string) {
+	// Warp wins if installed — its CLI has no --working-directory flag,
+	// but its URI scheme `warp://action/new_tab?path=...` does the job.
+	if _, err := exec.LookPath("warp-terminal"); err == nil {
+		uri := "warp://action/new_tab?path=" + url.PathEscape(dir)
+		cmd := exec.Command("xdg-open", uri)
+		if err := cmd.Start(); err == nil {
+			go cmd.Wait()
+			return
+		}
+		// fall through to other terminals if xdg-open isn't around
+	}
+	if env := os.Getenv("TERMINAL"); env != "" {
+		if bin, err := exec.LookPath(env); err == nil {
+			runTerm(bin, []string{"--working-directory=" + dir}, dir)
+			return
+		}
+	}
+	for _, c := range terminalCandidates {
+		bin, err := exec.LookPath(c.bin)
+		if err != nil {
+			continue
+		}
+		runTerm(bin, c.args(dir), dir)
+		return
+	}
+	fmt.Fprintln(stderr(), "openTerminal: no known terminal found in PATH")
+}
+
+func runTerm(bin string, args []string, dir string) {
+	cmd := exec.Command(bin, args...)
+	cmd.Dir = dir // fallback for terminals whose flags didn't take
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintln(stderr(), "terminal:", err)
+		return
+	}
+	go cmd.Wait()
+}
+
+// shQuote escapes a path for single-quoted shell inclusion.
+func shQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func addClass(w *gtk.Widget, name string) {
