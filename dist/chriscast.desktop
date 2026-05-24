@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=chriscast
+GenericName=File Launcher
+Comment=Raycast-style file launcher for Linux
+Exec=chriscast daemon
+Icon=chriscast
+Terminal=false
+Categories=Utility;FileTools;
+Keywords=launcher;search;files;raycast;spotlight;
+StartupNotify=false
+X-GNOME-Autostart-Notify=false
+NoDisplay=false

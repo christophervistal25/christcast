@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/chriscast/chriscast/internal/config"
 	"github.com/chriscast/chriscast/internal/index"
 	"github.com/chriscast/chriscast/internal/search"
+	"github.com/chriscast/chriscast/internal/store"
 
 	"github.com/gotk3/gotk3/gdk"
 	"github.com/gotk3/gotk3/glib"
@@ -138,6 +140,41 @@ func (a *App) build() error {
 	addClass(&a.list.Widget, "cct-list")
 	scrolled.Add(a.list)
 
+	// Bottom hint bar — persistent Raycast-style key legend.
+	hintSep, err := gtk.SeparatorNew(gtk.ORIENTATION_HORIZONTAL)
+	if err != nil {
+		return err
+	}
+	addClass(&hintSep.Widget, "cct-sep")
+	box.PackStart(hintSep, false, false, 0)
+
+	hintBar, err := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 0)
+	if err != nil {
+		return err
+	}
+	addClass(&hintBar.Widget, "cct-hint-bar")
+
+	hintInner, err := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 0)
+	if err != nil {
+		return err
+	}
+	hintInner.SetHAlign(gtk.ALIGN_END)
+	for _, h := range []string{
+		"↵  open",
+		"Ctrl+↵  reveal",
+		"Ctrl+C  copy path",
+		"Esc  close",
+	} {
+		lbl, err := gtk.LabelNew(h)
+		if err != nil {
+			return err
+		}
+		addClass(&lbl.Widget, "cct-hint")
+		hintInner.PackStart(lbl, false, false, 0)
+	}
+	hintBar.PackStart(hintInner, true, true, 0)
+	box.PackStart(hintBar, false, false, 0)
+
 	a.entry.Connect("changed", a.onChanged)
 	a.entry.Connect("activate", a.onActivate)
 	a.list.Connect("row-activated", a.onRowActivated)
@@ -229,6 +266,14 @@ func (a *App) renderList() {
 
 func buildRow(r search.Result) *gtk.ListBoxRow {
 	row, _ := gtk.ListBoxRowNew()
+	hbox, _ := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 0)
+
+	icon, _ := gtk.LabelNew(glyphFor(r.File))
+	icon.SetHAlign(gtk.ALIGN_CENTER)
+	icon.SetSizeRequest(28, -1)
+	addClass(&icon.Widget, "cct-icon")
+	hbox.PackStart(icon, false, false, 0)
+
 	vbox, _ := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
 	label := r.File.Base
 	if r.File.IsDir {
@@ -243,9 +288,35 @@ func buildRow(r search.Result) *gtk.ListBoxRow {
 	addClass(&path.Widget, "cct-path")
 	vbox.PackStart(base, false, false, 0)
 	vbox.PackStart(path, false, false, 0)
-	row.Add(vbox)
+	hbox.PackStart(vbox, true, true, 0)
+
+	row.Add(hbox)
 	// stash result via row index — retrieved on activate
 	return row
+}
+
+// glyphFor returns a small Unicode glyph chosen by file kind / extension.
+func glyphFor(fi *store.FileInfo) string {
+	if fi.IsDir {
+		return "📁"
+	}
+	ext := strings.ToLower(filepath.Ext(fi.Path))
+	switch ext {
+	case ".go", ".py", ".js", ".ts", ".tsx", ".rb", ".rs", ".java",
+		".c", ".cpp", ".h", ".hpp", ".php":
+		return "⟨⟩"
+	case ".md", ".txt", ".rst":
+		return "≡"
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg":
+		return "▣"
+	case ".pdf":
+		return "▤"
+	case ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar":
+		return "▢"
+	case ".mp3", ".wav", ".flac", ".mp4", ".mkv", ".mov", ".webm":
+		return "▶"
+	}
+	return "·"
 }
 
 func (a *App) onActivate() {
